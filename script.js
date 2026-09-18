@@ -56,28 +56,61 @@ function dateBoxHtml(ride) {
     </div>`;
 }
 
+const SHARE_ICON_SVG = `<svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3v11"></path>
+  <path d="M8 6.5 12 2.5l4 4"></path>
+  <path d="M5 13v7.5h14V13"></path>
+</svg>`;
+
+function difficultyPillHtml(ride) {
+  if (!ride.RideDifficulty) return '';
+  return `<div class="difficulty-pill">${escapeHtml(ride.RideDifficulty)}</div>`;
+}
+
+function ridersRowHtml(ride, extraSuffix) {
+  if (ride.RideRiders === null || ride.RideRiders === undefined || ride.RideRiders === '') return '';
+  const text = `${escapeHtml(ride.RideRiders)} riders${extraSuffix || ''}\nare committed!`;
+  return `<div class="riders-row"><span class="icon-bike" aria-hidden="true"></span><span>${text}</span></div>`;
+}
+
 function rideCardHtml(ride, committed) {
   const isCommitted = !!committed[ride.RideName];
   const stateText = isCommitted ? 'You are\ncommitted!' : 'You haven’t\ncommitted';
   return `
     <a class="ride-card" href="#/ride/${encodeURIComponent(ride.RideName)}">
-      <div class="ride-card-state ${isCommitted ? 'is-committed' : ''}">${escapeHtml(stateText)}</div>
-      <div class="ride-name">${escapeHtml(ride.RideName)}</div>
+      <div class="ride-card-top">
+        <div class="ride-name">${escapeHtml(ride.RideName)}</div>
+        <button type="button" class="share-btn" data-ride="${escapeHtml(ride.RideName)}" aria-label="Share ${escapeHtml(ride.RideName)}">${SHARE_ICON_SVG}</button>
+      </div>
       <div class="ride-card-divider"></div>
       <div class="ride-card-body">
         ${dateBoxHtml(ride)}
         <div class="ride-card-info">
-          <div class="ride-stats">
-            <span>${escapeHtml(ride.RideDistance)}</span>
-            <span>${escapeHtml(ride.RideDuration)}</span>
+          <div class="ride-stats-row">
+            ${difficultyPillHtml(ride)}
+            <div class="ride-stats">
+              <span>${escapeHtml(ride.RideDistance)}</span>
+              <span>${escapeHtml(ride.RideDuration)}</span>
+            </div>
           </div>
           <div class="ride-place">
             <span>${escapeHtml(ride.RideTrailName)}</span>
             <span>${escapeHtml(ride.RideLocation)}</span>
           </div>
+          ${ridersRowHtml(ride)}
         </div>
+        <div class="ride-card-state ${isCommitted ? 'is-committed' : ''}">${escapeHtml(stateText)}</div>
       </div>
     </a>`;
+}
+
+function shareRide(rideName) {
+  const url = `${window.location.origin}${window.location.pathname}#/ride/${encodeURIComponent(rideName)}`;
+  if (navigator.share) {
+    navigator.share({ title: rideName, url }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).catch(() => {});
+  }
 }
 
 async function renderList() {
@@ -98,6 +131,14 @@ async function renderList() {
 
   const committed = getCommitted();
   view.innerHTML = `<div class="ride-list">${rides.map((r) => rideCardHtml(r, committed)).join('')}</div>`;
+
+  view.querySelectorAll('.share-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      shareRide(btn.dataset.ride);
+    });
+  });
 }
 
 async function renderDetail(rideName) {
@@ -121,23 +162,32 @@ async function renderDetail(rideName) {
   const isCommitted = !!committed[ride.RideName];
 
   view.innerHTML = `
-    <a class="detail-back" href="#/" aria-label="Back to rides">
-      <svg viewBox="0 0 54 90" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M46 5 12 45l34 40"></path>
-      </svg>
-    </a>
-    <div class="detail-name">${escapeHtml(ride.RideName)}</div>
-    <div class="detail-body">
-      ${dateBoxHtml(ride)}
-      <div class="detail-info">
-        <div class="detail-trail">${escapeHtml(ride.RideTrailName)}</div>
-        <div class="detail-location">${escapeHtml(ride.RideLocation)}</div>
-        <div class="detail-stats">
-          <span>${escapeHtml(ride.RideDistance)}</span>
-          <span>${escapeHtml(ride.RideDuration)}</span>
+    <div class="detail-hero">
+      <a class="detail-back" href="#/" aria-label="Back to rides">
+        <svg viewBox="0 0 54 90" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M46 5 12 45l34 40"></path>
+        </svg>
+      </a>
+      <div class="detail-name">${escapeHtml(ride.RideName)}</div>
+      <div class="detail-body">
+        ${dateBoxHtml(ride)}
+        <div class="detail-info">
+          <div class="detail-trail">${escapeHtml(ride.RideTrailName)}</div>
+          <div class="detail-location">${escapeHtml(ride.RideLocation)}</div>
+          <div class="detail-stats">
+            ${difficultyPillHtml(ride)}
+            <span>${escapeHtml(ride.RideDistance)}</span>
+            <span>${escapeHtml(ride.RideDuration)}</span>
+          </div>
         </div>
       </div>
     </div>
+    ${ride.RideRiders !== null && ride.RideRiders !== undefined && ride.RideRiders !== ''
+      ? `<div class="detail-riders-row">
+          <span class="icon-bike" aria-hidden="true"></span>
+          <div class="detail-riders-text">${escapeHtml(ride.RideRiders)} riders${isCommitted ? ' + you' : ''}<br>are committed!</div>
+        </div>`
+      : ''}
     <div class="commit-section">
       <div class="commit-status">${isCommitted ? 'You are committed!' : 'You haven’t committed yet.'}</div>
       <button type="button" class="commit-btn ${isCommitted ? 'is-committed' : ''}" id="commit-toggle">
